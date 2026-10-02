@@ -62,6 +62,9 @@ export function instantiateCore(bytes) {
 			const text = REASONS[admission.reason] || 'ROM admission failed';
 			return admission.reason === 1 ? text : `${text}: ${admission.member}`;
 		},
+		loadEmbedded() {
+			if (x.sh_load_embedded() !== 0) throw new Error('embedded sound image rejected');
+		},
 		loadImages(music, effects, prom) {
 			const ptrs = [music, effects, prom].map(copyIn);
 			const status = x.sh_load_images(ptrs[0], music.length, ptrs[1], effects.length, ptrs[2], prom.length);

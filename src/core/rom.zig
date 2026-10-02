@@ -81,6 +81,35 @@ pub fn interleave(even: []const u8, odd: []const u8, out: []u8) void {
 	}
 }
 
+const sound_music_len = @typeInfo(@FieldType(Images, "music")).array.len;
+const sound_effects_len = @typeInfo(@FieldType(Images, "effects")).array.len;
+const sound_prom_len = @typeInfo(@FieldType(Images, "prom")).array.len;
+
+/// Reverse the admitted sound-board image and check the historical SHA-1s.
+/// The image is four interleaved 68000 ROMs, two concatenated Z80 ROMs, then the PROM.
+pub fn verifySoundImage(image: []const u8) bool {
+	if (image.len != sound_music_len + sound_effects_len + sound_prom_len) return false;
+	var raw: [7][8192]u8 = undefined;
+	deinterleave(image[0..16384], raw[0][0..8192], raw[1][0..8192]);
+	deinterleave(image[16384..sound_music_len], raw[2][0..8192], raw[3][0..8192]);
+	@memcpy(raw[4][0..4096], image[sound_music_len..][0..4096]);
+	@memcpy(raw[5][0..4096], image[sound_music_len + 4096 ..][0..4096]);
+	@memcpy(raw[6][0..sound_prom_len], image[image.len - sound_prom_len ..]);
+	for (spy_hunter, 0..) |member, i| {
+		var digest: [20]u8 = undefined;
+		std.crypto.hash.Sha1.hash(raw[i][0..member.size], &digest, .{});
+		if (!std.mem.eql(u8, &std.fmt.bytesToHex(digest, .lower), member.sha1)) return false;
+	}
+	return true;
+}
+
+fn deinterleave(src: []const u8, even: []u8, odd: []u8) void {
+	for (even, odd, 0..) |*even_byte, *odd_byte, i| {
+		even_byte.* = src[2 * i];
+		odd_byte.* = src[2 * i + 1];
+	}
+}
+
 // ---- tests: synthetic members in an in-memory stored ZIP ----
 
 const t = std.testing;

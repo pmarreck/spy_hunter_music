@@ -1,6 +1,7 @@
 # Dirtree: Stateful directory trees in the CLI for humans and LLMs. https://github.com/pmarreck/dirtree
 ver=1.2
 annotate=[
+	.github/workflows/pages.yml = GitHub Pages build of zig-out/web
 	PLAN.md = Implementation checkpoints and gun-sound regression follow-up
 	build.zig = Zig build: Musashi opcode generation, C cores, core tests, static lib and C CLI
 	build.zig.zon = Pinned Musashi and floooh/chips source dependencies
@@ -19,13 +20,15 @@ annotate=[
 	src/core/ffi.zig = C ABI exports: admission, boot, render, session (keys/guns/pause), gain, WAV
 	src/core/keyboard.zig = Legacy byte and kitty CSI-u key decoding plus control mapping
 	src/core/lib.zig = Library root that exports the C ABI
-	src/core/rom.zig = Sound-ROM member table, size/SHA-1 admission and 68000 interleave
+	src/core/rom.zig = Sound-ROM admission and sound-image SHA-1 check
 	src/core/root.zig = Test root referencing every core module
 	src/core/terminal.zig = Terminal/multiplexer detection from env plus kitty probe verdict
 	src/core/tips.zig = --tips advice rendering (text, color, JSON) per terminal and multiplexer
 	src/core/wav.zig = WAV header and PCM16 sample encoding
 	src/core/zip.zig = Bounds-checked in-memory ZIP member lookup, inflate and CRC-32
 	src/web/compat/setjmp.h = Wasm-only setjmp shim (Musashi bus-error trap point never longjmps)
+	src/web/sound_image.bin = Seven sound-board members in admitted-image layout
+	src/web/sound_image.zig = SHA-1 check of the embedded sound-board image
 	src/web/wasm.zig = Wasm root: core C ABI plus sh_alloc/sh_free
 	test = Complete test entry point
 	tests = One-entrypoint ROM-independent unit, CLI, PTY, build and ZIP regressions

@@ -1,6 +1,6 @@
 # Spy Hunter Music
 
-Run the original Spy Hunter arcade sound programs independently of the game. A Zig core emulates the Motorola 68000 music board and a Z80 sound-effects board with two AY-3-8910 chips. The music is synthesized from extracted ROM data. No original ROMs are required or available.
+Run the original Spy Hunter arcade sound programs independently of the game. A Zig core emulates the Motorola 68000 music board and a Z80 sound-effects board with two AY-3-8910 chips. The native player reads a local archive you supply. The web player embeds only that sound board.
 
 ## Play
 
@@ -22,13 +22,16 @@ The lowercase death key and uppercase quit key are intentionally different. Audi
 
 Use `--volume 0.3` for a quieter start. Where the terminal honors the kitty keyboard protocol with key-release events, the guns fire from key press until release, and the ROM finishes the shot in progress, as in the arcade. WezTerm does this only with `config.enable_kitty_keyboard = true` (default off); Herdr answers the protocol query but forwards plain keys. At startup the player checks the terminal and prints a yellow warning when key releases cannot arrive; the first space press confirms. Run `spy-hunter-music --tips` (or `--tips --json`) for what was detected and how to enable key releases in your terminal or multiplexer; see [the terminal notes](docs/TERMINALS.md). Without key releases, each keystroke fires 0.14 s, the arcade tap's two shots; holding space then pauses once before autorepeat starts. If the process is killed with SIGKILL, run `reset` in case the terminal remains in kitty key-reporting mode. The player does not simulate the rest of the game or choose commands from a driving simulation.
 
-## Personal web player
+## Web player
+
+The same Zig core runs in the browser as WebAssembly inside an AudioWorklet. The seven sound-board members (music, effects and the gain PROM) are embedded in `spy_hunter.wasm`. The page does not publish them as their own file, and it does not include the rest of the game ROM. The artwork is `assets/G-6155.png`, copied into the built page as `background.png`. Space fires while held (real key releases), `d` plays the death cue, `p` pauses; the buttons do the same.
+
+Published page: <https://pmarreck.github.io/spy_hunter_music/>
 
 ```sh
-./serve            # http://127.0.0.1:8473/
+nix develop -c zig build web
+nix develop -c darkhttpd zig-out/web --addr 127.0.0.1 --port 8473 --index index.html
 ```
-
-The same Zig core runs in the browser as WebAssembly inside an AudioWorklet. `./serve` bundles only the seven sound-board ROM members into `zig-out/web/sound.zip`, and the page loads them automatically; the core verifies their SHA-1s as the CLI does. Space fires while held (real key releases), `d` plays the death cue, `p` pauses; the buttons do the same.
 
 ## Local ROMs only
 
@@ -42,7 +45,7 @@ spy-hunter-music inspect --rom "$HOME/ROMs/spyhunt.zip" --json
 
 The core reads seven exact sound-ROM members from the in-memory ZIP (stored or deflated), checks their sizes and historical MAME SHA-1 identities, and interleaves the 68000 ROMs. Unrelated graphics and game-ROM members are skipped. Historical SHA-1 matching identifies the expected dump; it is not a modern authenticity or security guarantee. Both the legacy short member names and current MAME sound-ROM names are recognized. A set that omits the shared SSIO PROM must be supplied as a complete local archive containing that PROM.
 
-No ROMs are downloaded, extracted to disk, bundled, or committed. Rendered music also stays untracked. The source license does not grant rights to game assets or the Peter Gunn composition.
+The native player reads a local archive and does not copy it. The web image at `src/web/sound_image.bin` is those seven sound-board members in the layout the board runs; it is build input for the wasm, not a file the page serves. The MIT license does not cover that image or the Peter Gunn composition. Rendered music stays untracked.
 
 ZIP input can also come from standard input (limited to 16 MiB):
 
@@ -69,7 +72,7 @@ Output is 48 kHz mono signed 16-bit PCM WAV. Existing files are refused, includi
 nix flake check
 ```
 
-Zig 0.16 builds a pure Zig core (C ABI in `include/spy_hunter.h`) and a C CLI that uses only that ABI. Nix pins Zig, SDL2, Musashi and floooh/chips; the emulator cores are fetched once into a fixed-output derivation. No emulator installation is required. `./build` creates a host-specific symlink beneath `bin/<os>/<arch>/`; Nix products remain beneath `.nix-out/<target>/ReleaseFast`. The portable `bin/spy-hunter-music` invokes the already-published host product, building through Nix only when it is missing. No dependency evaluation occurs on the warm path. `./run` deliberately rebuilds before launching.
+Zig 0.16 builds a pure Zig core (C ABI in `include/spy_hunter.h`) and a C CLI that uses only that ABI. Nix pins Zig, SDL2, Musashi and floooh/chips; the emulator cores are fetched once into a fixed-output derivation. The flake package is that native player, built from source. It does not take a compiled executable or the web sound-board image as an input, and the wasm is not a flake output. No emulator installation is required. `./build` creates a host-specific symlink beneath `bin/<os>/<arch>/`; Nix products remain beneath `.nix-out/<target>/ReleaseFast`. The portable `bin/spy-hunter-music` invokes the already-published host product, building through Nix only when it is missing. No dependency evaluation occurs on the warm path. `./run` deliberately rebuilds before launching.
 
 Supported targets are Linux x86_64/aarch64 and macOS aarch64. The Zig rewrite (0.2.0) has been built and tested on Linux x86_64 only; macOS aarch64 is pending a native run (the earlier LuaJIT version passed there). Linux aarch64 is configured, but has not been executed on an ARM Linux machine.
 

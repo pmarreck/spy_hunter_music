@@ -1,6 +1,5 @@
-// Main-thread controller for the personal web player: loads the bundled
-// sound ROMs (sound.zip, built locally by ./serve), starts audio, and maps
-// buttons and keys to the core's events.
+// Main-thread controller for the web player. The sound-board image is inside
+// spy_hunter.wasm. Buttons and keys map to the core's events.
 import { keyEvent, EVENT } from './keys.js';
 
 const $ = (id) => document.getElementById(id);
@@ -39,8 +38,8 @@ async function start() {
 		if (navigator.audioSession) navigator.audioSession.type = 'playback';
 		context = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
 		const resumed = context.resume();
-		detail('Downloading the sound boards…');
-		const [wasm, zip] = await Promise.all([fetchBytes('spy_hunter.wasm'), fetchBytes('sound.zip')]);
+		detail('Downloading the player…');
+		const wasm = await fetchBytes('spy_hunter.wasm');
 		detail('Loading the audio engine…');
 		if (!context.audioWorklet) throw new Error('this browser has no AudioWorklet (needs HTTPS or localhost)');
 		await context.audioWorklet.addModule('worklet.js');
@@ -48,7 +47,7 @@ async function start() {
 		node = new AudioWorkletNode(context, 'spy-hunter', {
 			numberOfInputs: 0,
 			outputChannelCount: [1],
-			processorOptions: { wasm, zip },
+			processorOptions: { wasm },
 		});
 		node.onprocessorerror = () => status('The audio engine crashed while starting.', true);
 		node.port.onmessage = ({ data }) => {
@@ -66,7 +65,7 @@ async function start() {
 				ui.play.textContent = paused ? 'Play' : 'Pause';
 				status(paused ? 'Paused.' : 'Playing.');
 			} else if (data.type === 'error') {
-				status(`${data.message}. Rebuild the page with ./serve.`, true);
+				status(`${data.message}.`, true);
 			}
 		};
 		node.connect(context.destination);
@@ -74,7 +73,7 @@ async function start() {
 	} catch (error) {
 		context = null;
 		ui.play.disabled = false;
-		status(`Could not start: ${error.message}. Start the page with ./serve.`, true);
+		status(`Could not start: ${error.message}.`, true);
 	}
 }
 

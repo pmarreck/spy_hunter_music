@@ -11,11 +11,10 @@ class SpyHunterProcessor extends AudioWorkletProcessor {
 		this.paused = false;
 		this.quanta = 0;
 		this.reported = false;
-		const { wasm, zip } = options.processorOptions;
+		const { wasm } = options.processorOptions;
 		try {
 			this.core = instantiateCore(new Uint8Array(wasm));
-			const admission = this.core.admitZip(new Uint8Array(zip));
-			if (!admission.ok) throw new Error(this.core.describe(admission));
+			this.core.loadEmbedded();
 			const started = Date.now();
 			if (!this.core.boot(sampleRate, 1)) throw new Error('Sound-board boot failed');
 			this.bootMs = Date.now() - started;

@@ -33,9 +33,17 @@
         dontFixup = true;
       };
 
-      source = fs.toSource {
+      # Native package inputs are source only. The sound-board image and every
+      # compiled executable stay out of this derivation; the web build uses them.
+      packageSource = fs.toSource {
         root = ./.;
-        fileset = fs.unions [ ./build.zig ./build.zig.zon ./src ./include ./tests ./web ./build ./bin/spy-hunter-music ];
+        fileset = fs.difference
+          (fs.unions [ ./build.zig ./build.zig.zon ./src ./include ./build ./bin/spy-hunter-music ])
+          ./src/web/sound_image.bin;
+      };
+      testSource = fs.toSource {
+        root = ./.;
+        fileset = fs.unions [ ./build.zig ./build.zig.zon ./src ./include ./tests ./web ./assets ./build ./bin/spy-hunter-music ];
       };
       zigEnv = pkgs: ''
         export HOME=$TMPDIR
@@ -52,7 +60,7 @@
       package = pkgs: pkgs.stdenv.mkDerivation ((zigBuildInputs pkgs) // {
         pname = "spy-hunter-music";
         inherit version;
-        src = source;
+        src = packageSource;
         strictDeps = true;
         dontConfigure = true;
         buildPhase = ''
@@ -68,7 +76,7 @@
       test = pkgs: pkgs.stdenv.mkDerivation ((zigBuildInputs pkgs) // {
         pname = "spy-hunter-music-tests";
         inherit version;
-        src = source;
+        src = testSource;
         strictDeps = true;
         dontConfigure = true;
         nativeCheckInputs = [ pkgs.bash ];

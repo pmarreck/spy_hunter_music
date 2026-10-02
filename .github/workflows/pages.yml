@@ -1,0 +1,33 @@
+name: pages
+
+on:
+  push:
+    branches: [yolo]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      # Installs Nix on the runner. Not Garnix, and it does not use a Cachix binary cache.
+      - uses: cachix/install-nix-action@v31.11.1
+      - name: Build the web player
+        run: nix develop -c zig build web
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: zig-out/web
+      - id: deployment
+        uses: actions/deploy-pages@v4

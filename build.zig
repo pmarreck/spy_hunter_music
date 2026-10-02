@@ -48,6 +48,21 @@ const Cores = struct {
 	}
 };
 
+/// Sound-board image module for one target. Pure Zig: no emulator cores.
+fn soundImageModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
+	const rom_module = b.createModule(.{
+		.root_source_file = b.path("src/core/rom.zig"),
+		.target = target,
+		.optimize = optimize,
+	});
+	return b.createModule(.{
+		.root_source_file = b.path("src/web/sound_image.zig"),
+		.target = target,
+		.optimize = optimize,
+		.imports = &.{.{ .name = "rom", .module = rom_module }},
+	});
+}
+
 pub fn build(b: *std.Build) void {
 	const target = b.standardTargetOptions(.{});
 	const optimize = b.option(std.builtin.OptimizeMode, "optimize", "Optimization mode (default: ReleaseFast)") orelse .ReleaseFast;
@@ -62,8 +77,10 @@ pub fn build(b: *std.Build) void {
 	});
 	cores.addTo(test_module);
 	const core_tests = b.addTest(.{ .root_module = test_module });
+	const image_tests = b.addTest(.{ .root_module = soundImageModule(b, target, optimize) });
 	const test_step = b.step("test", "Run Zig core unit tests");
 	test_step.dependOn(&b.addRunArtifact(core_tests).step);
+	test_step.dependOn(&b.addRunArtifact(image_tests).step);
 
 	// The core library: the C ABI is the public interface for every consumer.
 	const lib_module = b.createModule(.{ .root_source_file = b.path("src/core/lib.zig"), .target = target, .optimize = optimize });
@@ -102,4 +119,6 @@ pub fn build(b: *std.Build) void {
 	const web_step = b.step("web", "Build the personal web player into zig-out/web");
 	web_step.dependOn(&b.addInstallArtifact(wasm, .{ .dest_dir = .{ .override = .{ .custom = "web" } } }).step);
 	web_step.dependOn(&b.addInstallDirectory(.{ .source_dir = b.path("web"), .install_dir = .{ .custom = "web" }, .install_subdir = "" }).step);
+	// One copy, at build time, from assets/. The source tree keeps the artwork there only.
+	web_step.dependOn(&b.addInstallFileWithDir(b.path("assets/G-6155.png"), .{ .custom = "web" }, "background.png").step);
 }

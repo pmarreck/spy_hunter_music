@@ -80,7 +80,7 @@ pub fn advice(d: terminal.Detection, out: *[8][]const u8) [][]const u8 {
 	}
 	if (d.verdict == .unknown) add(out, &n, "Run --tips from the terminal you play in; without a terminal on stdin and stdout the live check cannot run.");
 	add(out, &n, "Without key releases, each space press fires the arcade's two-shot tap; holding space pauses once before key repeat starts.");
-	add(out, &n, "The local web player (./serve) always has hold-to-fire, because browsers report key releases.");
+	add(out, &n, "The web player always has hold-to-fire, because browsers report key releases.");
 	return out[0..n];
 }
 

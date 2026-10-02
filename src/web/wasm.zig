@@ -1,9 +1,29 @@
-//! WebAssembly root for the personal web player: the core's C ABI plus a
-//! byte allocator so JavaScript can pass the user's ZIP into wasm memory.
+//! WebAssembly root for the web player: the core's C ABI, the embedded
+//! sound-board image, and a byte allocator for host buffers.
 const std = @import("std");
+const rom = @import("core").rom;
+const ffi = @import("core").ffi;
+
+const embedded = @embedFile("sound_image.bin");
 
 comptime {
-	_ = @import("core").ffi;
+	_ = ffi;
+}
+
+/// Load the embedded sound-board image after checking its historical SHA-1s.
+export fn sh_load_embedded() c_int {
+	if (!rom.verifySoundImage(embedded)) return 1;
+	const music_len = @typeInfo(@FieldType(rom.Images, "music")).array.len;
+	const effects_len = @typeInfo(@FieldType(rom.Images, "effects")).array.len;
+	const prom_len = @typeInfo(@FieldType(rom.Images, "prom")).array.len;
+	return ffi.sh_load_images(
+		embedded.ptr,
+		music_len,
+		embedded.ptr + music_len,
+		effects_len,
+		embedded.ptr + music_len + effects_len,
+		prom_len,
+	);
 }
 
 const allocator = std.heap.wasm_allocator;

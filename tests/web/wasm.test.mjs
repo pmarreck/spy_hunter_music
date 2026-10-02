@@ -8,6 +8,19 @@ const failures = [];
 const check = (ok, what) => { if (!ok) failures.push(what); };
 const core = instantiateCore(readFileSync(process.argv[2]));
 
+const loadEmbedded = core.exports.sh_load_embedded;
+if (typeof loadEmbedded !== 'function') {
+	check(false, 'wasm exports sh_load_embedded');
+} else {
+	const loaded = loadEmbedded();
+	check(loaded === 0, `embedded sound image loads (${loaded})`);
+	check(core.boot(48000, 1), 'embedded sound image boots');
+	const played = core.render(24000, 48000, 0.65);
+	let audible = false;
+	for (const sample of played) if (sample !== 0) { audible = true; break; }
+	check(audible, 'embedded sound image renders audio');
+}
+
 const bad = core.admitZip(new TextEncoder().encode('not a ZIP'));
 check(!bad.ok && bad.reason === 1 && bad.member === 'csd_u7a.u7', `malformed ZIP rejected: ${JSON.stringify(bad)}`);
 check(core.describe(bad).includes('Not a readable ZIP'), `admission message: ${core.describe(bad)}`);

@@ -72,7 +72,7 @@ export fn sh_admit_zip(zip_ptr: ?[*]const u8, zip_len: usize, result: ?*Admissio
 	return ok;
 }
 
-export fn sh_load_images(m: ?[*]const u8, ml: usize, e: ?[*]const u8, el: usize, p: ?[*]const u8, pl: usize) c_int {
+pub export fn sh_load_images(m: ?[*]const u8, ml: usize, e: ?[*]const u8, el: usize, p: ?[*]const u8, pl: usize) c_int {
 	board.load((m orelse return err_argument)[0..ml], (e orelse return err_argument)[0..el], (p orelse return err_argument)[0..pl]) catch return err_argument;
 	session = .{};
 	return ok;
