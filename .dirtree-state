@@ -45,6 +45,7 @@ annotate=[
 	tests/rom/run = ROM-gated render hash pins and death-command regression
 	tests/rom/wasm-render.mjs = Wasm render to PCM for native parity check
 	tests/web/run = Web suite: key classifier and wasm core via Node
+	tests/windows/device.c = Wine check: injected console keys and one completed waveOut buffer
 	tests/windows/encode.c = Host check that Windows keys encode as kitty CSI-u
 	tests/windows/run = Cross-builds x86_64 Windows and runs it under Wine when present
 	web/app.js = Main-thread controller: ROM picker (IndexedDB), audio start, buttons, keys

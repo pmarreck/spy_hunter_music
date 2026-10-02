@@ -41,6 +41,12 @@ if zig build -Dtarget=x86_64-windows-gnu -Dcpu=baseline -Doptimize=ReleaseFast -
 			WINEDEBUG=-all wine "$exe" render --rom "$win_rom" --seconds 2 --command 1 --output "$win_out" >"$scratch/win.out" 2>"$scratch/win.err" || fail "wine render: $(cat "$scratch/win.err")"
 			cmp -s "$scratch/native.wav" "$scratch/win.wav" || fail "windows render differs from the native render"
 		fi
+		if zig cc -target x86_64-windows-gnu -std=c11 -Wall -Wextra -Werror -I src/cli -I include -o "$scratch/device.exe" tests/windows/device.c src/cli/terminal_windows.c src/cli/terminal_keys.c src/cli/audio_windows.c "$prefix/lib/spy_hunter.lib" -lwinmm; then
+			WINEDEBUG=-all wine "$scratch/device.exe" >"$scratch/device.out" 2>"$scratch/device.err" || fail "windows console/waveOut check failed: $(cat "$scratch/device.out" "$scratch/device.err")"
+			grep -F -q 'PASS: windows console key-up and waveOut playback' "$scratch/device.out" || fail "windows console/waveOut check: $(cat "$scratch/device.out")"
+		else
+			fail "windows console/waveOut check did not compile"
+		fi
 	else
 		printf '\033[33mNOT RUN: wine execution (wine is not installed)\033[0m\n'
 	fi
