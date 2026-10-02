@@ -45,7 +45,7 @@ spy-hunter-music inspect --rom "$HOME/ROMs/spyhunt.zip" --json
 
 The core reads seven exact sound-ROM members from the in-memory ZIP (stored or deflated), checks their sizes and historical MAME SHA-1 identities, and interleaves the 68000 ROMs. Unrelated graphics and game-ROM members are skipped. Historical SHA-1 matching identifies the expected dump; it is not a modern authenticity or security guarantee. Both the legacy short member names and current MAME sound-ROM names are recognized. A set that omits the shared SSIO PROM must be supplied as a complete local archive containing that PROM.
 
-The native player reads a local archive and does not copy it. The web image at `src/web/sound_image.bin` is those seven sound-board members in the layout the board runs; it is build input for the wasm, not a file the page serves. The MIT license does not cover that image or the Peter Gunn composition. Rendered music stays untracked.
+The native player reads a local archive and does not copy it. The web image at `src/web/sound_image.bin` is those seven sound-board members in the layout the board runs; it is build input for the wasm, not a file the page serves. The MIT license does not cover that image or the Peter Gunn composition. Spy Hunter © Warner Bros. Entertainment Inc. Originally Bally Midway, 1983. Peter Gunn theme by Henry Mancini. Rendered music stays untracked.
 
 ZIP input can also come from standard input (limited to 16 MiB):
 
@@ -74,9 +74,17 @@ nix flake check
 
 Zig 0.16 builds a pure Zig core (C ABI in `include/spy_hunter.h`) and a C CLI that uses only that ABI. Nix pins Zig, SDL2, Musashi and floooh/chips; the emulator cores are fetched once into a fixed-output derivation. The flake package is that native player, built from source. It does not take a compiled executable or the web sound-board image as an input, and the wasm is not a flake output. No emulator installation is required. `./build` creates a host-specific symlink beneath `bin/<os>/<arch>/`; Nix products remain beneath `.nix-out/<target>/ReleaseFast`. The portable `bin/spy-hunter-music` invokes the already-published host product, building through Nix only when it is missing. No dependency evaluation occurs on the warm path. `./run` deliberately rebuilds before launching.
 
-Supported targets are Linux x86_64/aarch64 and macOS aarch64. The Zig rewrite (0.2.0) has been built and tested on Linux x86_64 only; macOS aarch64 is pending a native run (the earlier LuaJIT version passed there). Linux aarch64 is configured, but has not been executed on an ARM Linux machine.
+Supported targets are Linux x86_64/aarch64, macOS aarch64, and Windows x86_64. The Zig rewrite (0.2.0) has been built and tested on Linux x86_64; macOS aarch64 is pending a native run (the earlier LuaJIT version passed there). Linux aarch64 is configured, but has not been executed on an ARM Linux machine.
 
-`./test` is the complete entry point: Zig core units (key decoding, controller, ZIP/SHA-1 admission, WAV, synthetic 68000/Z80 programs for interrupts and command delivery), the C CLI surface, real PTY cleanup and host publication. Those require no game ROM, speakers, NAS or external service. Where a locally owned `spyhunt.zip` exists, `tests/rom/run` also checks per-platform render hashes and the startup death command; without one it reports NOT RUN. The first Nix bootstrap may need network access for pinned dependencies.
+Cross-build the Windows executable with Zig. `./build` and the flake publish the host player only:
+
+```sh
+nix develop -c zig build -Dtarget=x86_64-windows-gnu -Dcpu=baseline --prefix zig-out/x86_64-windows-gnu/ReleaseFast
+```
+
+That writes `zig-out/x86_64-windows-gnu/ReleaseFast/bin/spy-hunter-music.exe`. Playback uses waveOut and the Windows console (cmd, PowerShell, or Windows Terminal), which reports key-up so holding space keeps firing. Git Bash and mintty do not present a console. On 2026-10-02 Wine ran `--about` and a 2 second render that matched the Linux x86_64 WAV. waveOut and the console were not exercised on a Windows machine.
+
+`./test` is the complete entry point: Zig core units (key decoding, controller, ZIP/SHA-1 admission, WAV, synthetic 68000/Z80 programs for interrupts and command delivery), the C CLI surface, real PTY cleanup, host publication, and the Windows x86_64 cross build. Those require no game ROM, speakers, NAS or external service. Where Wine is installed, the Windows suite also runs `--about` and, when a local ROM and the native binary exist, compares a 2 second render. Without Wine it reports NOT RUN for execution and still requires a PE executable. Where a locally owned `spyhunt.zip` exists, `tests/rom/run` also checks per-platform render hashes and the startup death command; without one it reports NOT RUN. The first Nix bootstrap may need network access for pinned dependencies.
 
 ## What was verified
 

@@ -13,10 +13,18 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <SDL.h>
-
+#include "audio.h"
 #include "spy_hunter.h"
 #include "terminal.h"
+
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+#ifdef _WIN32
+#include <io.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 #define VERSION "0.2.0"
 #define RATE 48000
@@ -31,12 +39,14 @@
 #define PLATFORM "macos"
 #elif defined(__linux__)
 #define PLATFORM "linux"
+#elif defined(_WIN32)
+#define PLATFORM "windows"
 #else
 #define PLATFORM "unknown"
 #endif
-#if defined(__aarch64__)
+#if defined(__aarch64__) || defined(_M_ARM64)
 #define ARCH "aarch64"
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) || defined(_M_X64)
 #define ARCH "x86_64"
 #else
 #define ARCH "unknown"
@@ -44,7 +54,7 @@
 
 static const char help_text[] =
 	"spy-hunter-music " VERSION "\n"
-	"Original Spy Hunter arcade sound-ROM player. Linux and macOS.\n"
+	"Original Spy Hunter arcade sound-ROM player. Linux, macOS and Windows.\n"
 	"\n"
 	"Usage: spy-hunter-music [play|render|inspect] [OPTIONS]\n"
 	"\n"
@@ -66,7 +76,9 @@ static const char help_text[] =
 	"p pauses and resumes. Quit with q/Q, uppercase D, or Ctrl-C/Q/D.\n"
 	"\n"
 	"No ROM downloads. Only the sound boards run; no game/video emulation.\n"
-	"Output files are never overwritten. Music and ROM assets stay private.\n";
+	"Output files are never overwritten. Music and ROM assets stay private.\n"
+	"Spy Hunter © Warner Bros. Entertainment Inc. Originally Bally Midway, 1983.\n"
+	"Peter Gunn theme by Henry Mancini.\n";
 
 typedef enum { MODE_PLAY, MODE_RENDER, MODE_INSPECT, MODE_HELP, MODE_ABOUT, MODE_TIPS } mode_t_;
 
@@ -183,7 +195,8 @@ static uint8_t *read_stream(FILE *f, const char *what, size_t *len) {
 static const char *default_rom(void) {
 	static char paths[3][4096];
 	const char *home = getenv("HOME");
-	if (!home) home = ".";
+	if (!home || !*home) home = getenv("USERPROFILE");
+	if (!home || !*home) home = ".";
 	const char *env = getenv("SPY_HUNTER_ROM");
 	snprintf(paths[0], sizeof paths[0], "%s/Code/spy_hunter_music/local/spyhunt.zip", home);
 	snprintf(paths[1], sizeof paths[1], "%s", "/mnt/Fileserver/Emulation/ROMs/MAME/ROMs/spyhunt.zip");
@@ -262,7 +275,10 @@ static void write_all(int fd, const void *data, size_t n) {
 
 static void render(const options *o) {
 	int stream = is_stdout(o->output);
-	int fd = stream ? STDOUT_FILENO : open(o->output, O_WRONLY | O_CREAT | O_EXCL, 0644);
+	int fd = stream ? STDOUT_FILENO : open(o->output, O_WRONLY | O_CREAT | O_EXCL | O_BINARY, 0644);
+#ifdef _WIN32
+	if (stream) _setmode(fd, _O_BINARY);
+#endif
 	if (fd < 0) die("Cannot create output (already exists or unavailable): %s", o->output);
 	uint64_t count = (uint64_t)floor(o->seconds * RATE);
 	uint8_t header[44];
@@ -291,10 +307,28 @@ static void render(const options *o) {
 
 static void status_line(const char *message) { fprintf(stderr, "%s\r\n", message); }
 
+#ifndef _WIN32
 extern char **environ;
+#endif
 
 /* The process environment as NUL-separated KEY=VALUE entries for the core. */
 static size_t environment_block(uint8_t *out, size_t cap) {
+#ifdef _WIN32
+	/* mingw's environ macro is awkward, and this block is already the shape
+	 * the core parses. Windows and Wine set OS=Windows_NT here. */
+	char *block = GetEnvironmentStringsA();
+	if (!block) return 0;
+	size_t n = 0;
+	for (const char *p = block; *p; ) {
+		size_t len = strlen(p);
+		if (n + len + 1 > cap) break;
+		memcpy(out + n, p, len + 1);
+		n += len + 1;
+		p += len + 1;
+	}
+	FreeEnvironmentStringsA(block);
+	return n;
+#else
 	size_t n = 0;
 	for (char **e = environ; e && *e; e++) {
 		size_t len = strlen(*e);
@@ -304,6 +338,7 @@ static size_t environment_block(uint8_t *out, size_t cap) {
 		n += len + 1;
 	}
 	return n;
+#endif
 }
 
 static const char no_release_warning[] =
@@ -316,25 +351,12 @@ static void warn(int color, const char *message) {
 
 static void play(const options *o) {
 	if (!isatty(STDIN_FILENO)) die("Interactive input requires a terminal. Use render for noninteractive output.");
-	if (SDL_Init(SDL_INIT_AUDIO) != 0) die("SDL audio: %s", SDL_GetError());
-	SDL_AudioSpec want = {0};
-	want.freq = RATE;
-	want.format = AUDIO_F32SYS;
-	want.channels = 1;
-	want.samples = 1024;
-	SDL_AudioDeviceID device = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
-	if (!device) {
-		const char *e = SDL_GetError();
-		SDL_Quit();
-		die("Audio device: %s", e);
-	}
-	SDL_PauseAudioDevice(device, 0);
+	if (audio_open() != 0) die("%s", audio_error());
 	int tty = isatty(STDERR_FILENO) && !o->simple;
 	fprintf(stderr, "%sPeter Gunn | original arcade sound code%s\nSpace: machine guns  d: death cue  p: pause  q/Ctrl-C: quit\n",
 		tty ? "\033[1;36m" : "", tty ? "\033[0m" : "");
 	if (terminal_start() != 0) {
-		SDL_CloseAudioDevice(device);
-		SDL_Quit();
+		audio_close();
 		die("Interactive input requires a terminal. Use render for noninteractive output.");
 	}
 	sh_session_reset();
@@ -349,7 +371,7 @@ static void play(const options *o) {
 	static float samples[PLAY_CHUNK];
 	int mode_reported = 0, was_paused = 0, failed = 0;
 	for (;;) {
-		double now = SDL_GetTicks64() / 1000.0;
+		double now = audio_now();
 		int key = terminal_key();
 		unsigned flags = key >= 0 ? sh_key_byte((uint8_t)key, now) : 0;
 		flags |= sh_tick(now);
@@ -363,15 +385,13 @@ static void play(const options *o) {
 		int is_paused = (flags & SH_FLAG_PAUSED) != 0;
 		if (is_paused != was_paused) status_line(is_paused ? "Paused" : "Playing");
 		was_paused = is_paused;
-		if (SDL_GetQueuedAudioSize(device) / sizeof(float) < QUEUE_TARGET) {
+		if (audio_queued() < QUEUE_TARGET) {
 			if (sh_render(samples, PLAY_CHUNK, RATE) != SH_OK) { failed = 1; break; }
-			sh_apply_gain(samples, PLAY_CHUNK, o->volume);
-			if (SDL_QueueAudio(device, samples, sizeof samples) != 0) { failed = 1; break; }
-		} else SDL_Delay(2);
+			if (audio_write(samples, PLAY_CHUNK, o->volume) != 0) { failed = 1; break; }
+		} else audio_sleep();
 	}
 	terminal_stop();
-	SDL_CloseAudioDevice(device);
-	SDL_Quit();
+	audio_close();
 	if (failed) die("Playback failed");
 	fputs("Stopped. Terminal restored.\n", stderr);
 }

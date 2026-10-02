@@ -12,4 +12,9 @@ done
 cmp -s assets/G-6155.png zig-out/web/background.png || { printf 'FAIL: background.png is not the single assets/G-6155.png copy\n' >&2; failures=$((failures + 1)); }
 [[ ! -e zig-out/web/sound.zip && ! -e zig-out/web/sound_image.bin ]] || { printf 'FAIL: sound bytes published as their own file\n' >&2; failures=$((failures + 1)); }
 [[ ! -e web/background.png && ! -e web/sound.zip ]] || { printf 'FAIL: web/ duplicates the artwork or publishes a sound archive\n' >&2; failures=$((failures + 1)); }
+credit='Spy Hunter © Warner Bros. Entertainment Inc. Originally Bally Midway, 1983. Peter Gunn theme by Henry Mancini.'
+for page in web/index.html zig-out/web/index.html; do
+	grep -F -q "$credit" "$page" || { printf 'FAIL: %s does not credit Warner Bros. Entertainment Inc. and Henry Mancini\n' "$page" >&2; failures=$((failures + 1)); }
+done
+grep -F -q '.credit' web/style.css || { printf 'FAIL: style.css has no credit style\n' >&2; failures=$((failures + 1)); }
 exit "$failures"

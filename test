@@ -16,7 +16,7 @@ fi
 zig build test || failures=$((failures + 1))
 if zig build; then
 	export SPY_HUNTER_BIN="$PWD/zig-out/bin/spy-hunter-music"
-	for suite in tests/cli tests/terminal tests/build tests/web/run tests/rom/run; do
+	for suite in tests/cli tests/terminal tests/build tests/web/run tests/rom/run tests/windows/run; do
 		bash "$suite" || failures=$((failures + 1))
 	done
 else

@@ -29,6 +29,7 @@ pub fn terminalName(term: terminal.Terminal) []const u8 {
 		.konsole => "Konsole",
 		.xterm => "xterm",
 		.rio => "Rio",
+		.windows_console => "the Windows console",
 	};
 }
 
@@ -77,6 +78,7 @@ pub fn advice(d: terminal.Detection, out: *[8][]const u8) [][]const u8 {
 		.apple_terminal => add(out, &n, "Apple Terminal does not report key releases. Use Ghostty, kitty, iTerm2 or WezTerm with enable_kitty_keyboard."),
 		.xterm => add(out, &n, "xterm does not implement the kitty keyboard protocol. Use Ghostty, kitty, Alacritty, foot or WezTerm with enable_kitty_keyboard."),
 		.unknown => add(out, &n, "Key releases need a terminal that implements the kitty keyboard protocol with event types: Ghostty, kitty, Alacritty 0.13+, foot 1.10.3+, iTerm2 3.5+, Rio, or WezTerm with enable_kitty_keyboard."),
+		.windows_console => add(out, &n, "The Windows build reads key-up events from the console, so hold-to-fire works in cmd, PowerShell, and Windows Terminal. Git Bash and mintty are not consoles; run spy-hunter-music.exe from one of those."),
 	}
 	if (d.verdict == .unknown) add(out, &n, "Run --tips from the terminal you play in; without a terminal on stdin and stdout the live check cannot run.");
 	add(out, &n, "Without key releases, each space press fires the arcade's two-shot tap; holding space pauses once before key repeat starts.");
@@ -91,6 +93,7 @@ fn probeText(p: terminal.Probe) []const u8 {
 		.kitty_reply => "kitty keyboard active with key-release events",
 		.kitty_reply_without_releases => "kitty keyboard reply without key-release events",
 		.silent => "no reply",
+		.windows_console => "Windows console key-up events",
 	};
 }
 
@@ -165,6 +168,7 @@ test "every terminal without releases gets a terminal-specific fix" {
 		.{ .apple_terminal, "Apple Terminal does not report key releases" },
 		.{ .xterm, "xterm does not implement" },
 		.{ .unknown, "need a terminal that implements" },
+		.{ .windows_console, "Windows Terminal" },
 	};
 	inline for (@typeInfo(terminal.Terminal).@"enum".fields) |field| {
 		const term: terminal.Terminal = @enumFromInt(field.value);
@@ -194,6 +198,19 @@ test "multiplexers get their caveat first, whatever the terminal" {
 		const lines = advice(det(.wezterm, c[0], .no_releases), &advice_buf);
 		try t.expect(std.mem.indexOf(u8, lines[0], c[1]) != null);
 	}
+}
+
+test "windows tips name the console and do not claim the kitty protocol" {
+	var buf: [4096]u8 = undefined;
+	const probed = terminal.detect("OS=Windows_NT\x00TERM=xterm-kitty\x00", "\x1b[?11u\x1b[?62c", true);
+	const text = try renderTo(&buf, probed, .{});
+	try t.expect(std.mem.indexOf(u8, text, "Windows console") != null);
+	try t.expect(std.mem.indexOf(u8, text, "Hold-to-fire: available") != null);
+	try t.expect(std.mem.indexOf(u8, text, "kitty keyboard active") == null);
+	var buf2: [4096]u8 = undefined;
+	const idle = try renderTo(&buf2, terminal.detect("OS=Windows_NT\x00", "", false), .{});
+	try t.expect(std.mem.indexOf(u8, idle, "Windows Terminal") != null);
+	try t.expect(std.mem.indexOf(u8, idle, "kitty keyboard active") == null);
 }
 
 test "a working setup says nothing needs changing" {

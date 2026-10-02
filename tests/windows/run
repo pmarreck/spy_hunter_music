@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Windows x86_64 cross build. The key encoder runs on the host. The executable
+# is built with Zig's mingw and, when wine is installed, executed here.
+set -u
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." || exit 1
+failures=0
+fail() { printf 'FAIL: %s\n' "$1" >&2; failures=$((failures + 1)); }
+scratch="$(mktemp -d "${TMPDIR:-/tmp}/spy-hunter-windows.XXXXXX")" || exit 1
+trap 'rm -r -- "$scratch"' EXIT
+
+if zig cc -std=c11 -Wall -Wextra -Werror -I src/cli -o "$scratch/encode" tests/windows/encode.c src/cli/terminal_keys.c; then
+	"$scratch/encode" || failures=$((failures + 1))
+else
+	fail "windows key encoder did not compile"
+fi
+
+prefix="$PWD/zig-out/x86_64-windows-gnu/ReleaseFast"
+if zig build -Dtarget=x86_64-windows-gnu -Dcpu=baseline -Doptimize=ReleaseFast --prefix "$prefix"; then
+	exe="$prefix/bin/spy-hunter-music.exe"
+	[[ -f "$exe" ]] || fail "windows build produced no spy-hunter-music.exe"
+	magic="$(od -An -t x1 -N 2 "$exe" | tr -d ' \n')"
+	[[ "$magic" == "4d5a" ]] || fail "windows executable is not a PE (MZ) file: $magic"
+	if command -v wine >/dev/null 2>&1; then
+		about="$(WINEDEBUG=-all wine "$exe" --about 2>"$scratch/about.err")" || fail "wine --about failed: $(cat "$scratch/about.err")"
+		[[ "$about" == *"windows"* && "$about" == *"x86_64"* && "$about" != *$'\n'* ]] || fail "--about under wine: $about"
+		help="$(WINEDEBUG=-all wine "$exe" --help 2>"$scratch/help.err")" || fail "wine --help failed"
+		[[ "$help" == *"Windows"* && "$help" == *"Warner Bros. Entertainment Inc."* ]] || fail "--help under wine does not name Windows and the copyright holder"
+		rom=''
+		for candidate in "${SPY_HUNTER_ROM:-}" "$HOME/Code/spy_hunter_music/local/spyhunt.zip" /mnt/Fileserver/Emulation/ROMs/MAME/ROMs/spyhunt.zip "$HOME/ROMs/spyhunt.zip"; do
+			[[ -n "$candidate" && -r "$candidate" ]] && { rom="$candidate"; break; }
+		done
+		native="${SPY_HUNTER_BIN:-$PWD/zig-out/bin/spy-hunter-music}"
+		if [[ -z "$rom" || ! -x "$native" ]]; then
+			printf '\033[33mNOT RUN: windows/native render comparison (ROM or native binary missing)\033[0m\n'
+		else
+			win_rom="$(WINEDEBUG=-all winepath -w "$rom" 2>"$scratch/winepath.err")" || fail "winepath rom"
+			win_out="$(WINEDEBUG=-all winepath -w "$scratch/win.wav" 2>>"$scratch/winepath.err")" || fail "winepath output"
+			win_rom="${win_rom//$'\r'/}"
+			win_out="${win_out//$'\r'/}"
+			"$native" render --rom "$rom" --seconds 2 --command 1 --output "$scratch/native.wav" 2>"$scratch/native.err" || fail "native render: $(cat "$scratch/native.err")"
+			WINEDEBUG=-all wine "$exe" render --rom "$win_rom" --seconds 2 --command 1 --output "$win_out" >"$scratch/win.out" 2>"$scratch/win.err" || fail "wine render: $(cat "$scratch/win.err")"
+			cmp -s "$scratch/native.wav" "$scratch/win.wav" || fail "windows render differs from the native render"
+		fi
+	else
+		printf '\033[33mNOT RUN: wine execution (wine is not installed)\033[0m\n'
+	fi
+else
+	fail "zig build -Dtarget=x86_64-windows-gnu"
+fi
+
+exit "$failures"

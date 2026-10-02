@@ -97,6 +97,7 @@ body {
 .status { margin: 0; color: var(--cyan); font-size: 0.85rem; }
 .status.error { color: var(--alarm); }
 .keys { margin: 0; font-size: 0.8rem; color: rgba(233, 246, 255, 0.6); }
+.credit { margin: 0; max-width: 40rem; font-size: 0.72rem; line-height: 1.35; text-align: center; color: rgba(233, 246, 255, 0.45); }
 
 @media (max-width: 560px) {
 	.keys { display: none; }

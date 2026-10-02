@@ -45,10 +45,14 @@ tips TERM_PROGRAM=WezTerm; expect 0 'config.enable_kitty_keyboard = true' '--tip
 tips TERM_PROGRAM=Apple_Terminal; expect 0 'Apple Terminal does not report key releases' '--tips in Apple Terminal'
 tips VTE_VERSION=7600; expect 0 'VTE-based terminals' '--tips in GNOME Terminal'
 tips HERDR_ENV=1 TERM_PROGRAM=herdr WEZTERM_PANE=1; expect 0 'outside Herdr' '--tips in Herdr'
+tips OS=Windows_NT; expect 0 'Windows Terminal' '--tips on Windows'
+[[ "$output" != *'kitty keyboard active'* ]] || fail 'Windows tips must not claim kitty'
 tips TMUX=/tmp/t,1,0; expect 0 'outside tmux' '--tips in tmux'
 output="$(env -i TERM_PROGRAM=WezTerm "$bin" --tips --json < /dev/null 2>&1)"; status=$?
 expect 0 '"terminal":"wezterm"' '--tips --json'
 [[ "$output" == '{'*'}' ]] || fail "--tips --json is one JSON object: $output"
 run --help; expect 0 '--tips' '--help lists --tips'
+run --help; expect 0 'Windows' '--help names Windows'
+run --help; expect 0 'Warner Bros. Entertainment Inc.' '--help credits the copyright holder'
 [[ $failures -eq 0 ]] && printf 'PASS: CLI help, about, arguments, paths, admission errors and --tips\n'
 exit "$failures"

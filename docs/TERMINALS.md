@@ -21,6 +21,9 @@ Verified 2026-10-02 against each project's documentation or source at HEAD, exce
 | Zellij                                      | no: flag 1 only, answers `CSI ? 1 u`                                   | n/a                                                                   | `ZELLIJ`                                                              |
 | GNU screen                                  | no (unverified)                                                        | n/a                                                                   | `STY`                                                                 |
 | Herdr                                       | presses arrive as plain bytes (observed in 0.9.1); echoes pushed flags | n/a                                                                   | `HERDR_ENV=1`, `TERM_PROGRAM=herdr`                                   |
+| Windows console                             | yes: ReadConsoleInput key-up, encoded as kitty CSI-u                   | cmd, PowerShell, Windows Terminal. Git Bash and mintty are not consoles | `OS=Windows_NT` (wins over `TERM`)                                    |
+
+The Windows row is the `spy-hunter-music.exe` console adapter, not Windows Terminal's own keyboard protocol. `OS=Windows_NT` is set by Windows and by Wine.
 
 Primary sources:
 

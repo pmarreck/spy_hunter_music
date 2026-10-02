@@ -96,10 +96,19 @@ pub fn build(b: *std.Build) void {
 		&.{ "-std=c11", "-D_DEFAULT_SOURCE", "-Wall", "-Wextra", "-Werror", "-DSH_DEBUG_BUILD" }
 	else
 		&.{ "-std=c11", "-D_DEFAULT_SOURCE", "-Wall", "-Wextra", "-Werror" };
-	cli_module.addCSourceFiles(.{ .root = b.path("src/cli"), .files = &.{ "main.c", "terminal.c" }, .flags = cli_flags });
+	const windows = target.result.os.tag == .windows;
+	const cli_sources: []const []const u8 = if (windows)
+		&.{ "main.c", "terminal_windows.c", "terminal_keys.c", "audio_windows.c" }
+	else
+		&.{ "main.c", "terminal.c", "audio_sdl.c" };
+	cli_module.addCSourceFiles(.{ .root = b.path("src/cli"), .files = cli_sources, .flags = cli_flags });
 	cli_module.linkLibrary(lib);
-	cli_module.linkSystemLibrary("SDL2", .{});
-	cli_module.linkSystemLibrary("m", .{});
+	if (windows) {
+		cli_module.linkSystemLibrary("winmm", .{});
+	} else {
+		cli_module.linkSystemLibrary("SDL2", .{});
+		cli_module.linkSystemLibrary("m", .{});
+	}
 	const cli = b.addExecutable(.{ .name = "spy-hunter-music", .root_module = cli_module });
 	b.installArtifact(cli);
 

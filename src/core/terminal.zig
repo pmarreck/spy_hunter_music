@@ -5,7 +5,7 @@
 //! Written 2026-10-02 by Peter Marreck with Claude Opus 5.5 (claude-opus-5-5).
 const std = @import("std");
 
-pub const Terminal = enum { unknown, wezterm, kitty, ghostty, alacritty, foot, iterm2, apple_terminal, vte, konsole, xterm, rio };
+pub const Terminal = enum { unknown, wezterm, kitty, ghostty, alacritty, foot, iterm2, apple_terminal, vte, konsole, xterm, rio, windows_console };
 pub const Multiplexer = enum { none, herdr, tmux, zellij, screen };
 
 /// Result of probing the terminal on our stdin/stdout.
@@ -22,6 +22,9 @@ pub const Probe = enum {
 	kitty_reply_without_releases,
 	/// Nothing answered before the timeout.
 	silent,
+	/// Windows console adapter: key-up comes from ReadConsoleInput. A canned
+	/// kitty-shaped reply must not be described as a kitty terminal.
+	windows_console,
 };
 
 /// Kitty "report event types" progressive enhancement: press/repeat/release.
@@ -88,6 +91,9 @@ fn identifyMultiplexer(env: []const u8) Multiplexer {
 /// Identify the outer terminal. Inside a multiplexer TERM_PROGRAM and TERM
 /// describe the multiplexer, so terminal-specific variables come first.
 fn identifyTerminal(env: []const u8) Terminal {
+	// The Windows build reads the console itself. OS is set by Windows and
+	// Wine, and it wins over a TERM value inherited from the host.
+	if (is(env, "OS", "Windows_NT")) return .windows_console;
 	if (is(env, "TERM_PROGRAM", "WezTerm") or has(env, "WEZTERM_PANE") or has(env, "WEZTERM_EXECUTABLE")) return .wezterm;
 	if (has(env, "KITTY_WINDOW_ID") or termStarts(env, "xterm-kitty")) return .kitty;
 	if (is(env, "TERM_PROGRAM", "ghostty") or has(env, "GHOSTTY_RESOURCES_DIR") or termStarts(env, "xterm-ghostty")) return .ghostty;
@@ -104,17 +110,20 @@ fn identifyTerminal(env: []const u8) Terminal {
 
 pub fn detect(env: []const u8, reply: []const u8, probed: bool) Detection {
 	const multiplexer = identifyMultiplexer(env);
-	const probe = parseProbe(reply, probed);
+	const terminal_id = identifyTerminal(env);
+	const raw = parseProbe(reply, probed);
+	const windows = terminal_id == .windows_console and probed;
+	const probe: Probe = if (windows) .windows_console else raw;
 	const verdict: Verdict = switch (multiplexer) {
 		// Observed: Herdr 0.9.1 answers the query but forwards plain bytes.
 		.herdr => .no_releases,
-		else => switch (probe) {
+		else => if (windows) .releases else switch (raw) {
 			.not_run => .unknown,
-			.kitty_reply => .releases,
+			.kitty_reply, .windows_console => .releases,
 			.no_kitty_reply, .kitty_reply_without_releases, .silent => .no_releases,
 		},
 	};
-	return .{ .terminal = identifyTerminal(env), .multiplexer = multiplexer, .probe = probe, .verdict = verdict };
+	return .{ .terminal = terminal_id, .multiplexer = multiplexer, .probe = probe, .verdict = verdict };
 }
 
 // ---- tests ----
@@ -178,6 +187,8 @@ test "terminals and multiplexers are identified over a set of environments" {
 		.{ .env = block(&.{"ZELLIJ=0"}), .terminal = .unknown, .multiplexer = .zellij },
 		.{ .env = block(&.{ "STY=1234.pts-0.host", "VTE_VERSION=7600" }), .terminal = .vte, .multiplexer = .screen },
 		.{ .env = block(&.{"HERDR_ENV=0"}), .terminal = .unknown, .multiplexer = .none },
+		.{ .env = block(&.{"OS=Windows_NT"}), .terminal = .windows_console, .multiplexer = .none },
+		.{ .env = block(&.{ "OS=Windows_NT", "TERM=xterm-kitty", "KITTY_WINDOW_ID=1" }), .terminal = .windows_console, .multiplexer = .none },
 	};
 	for (cases) |c| {
 		const d = detect(c.env, "", false);
@@ -198,6 +209,20 @@ test "verdict: releases only with a kitty reply and no plain-key multiplexer" {
 	// Herdr answers the query yet forwarded plain keys (observed with 0.9.1).
 	try t.expectEqual(Verdict.no_releases, detect(block(&.{"HERDR_ENV=1"}), reply, true).verdict);
 	try t.expectEqual(Verdict.unknown, detect(block(&.{"TERM_PROGRAM=WezTerm"}), "", false).verdict);
+}
+
+test "Windows reports console key-up events and does not pretend to be kitty" {
+	const env = block(&.{ "OS=Windows_NT", "TERM=xterm-kitty" });
+	const d = detect(env, "\x1b[?11u\x1b[?62c", true);
+	try t.expectEqual(Terminal.windows_console, d.terminal);
+	try t.expectEqual(Probe.windows_console, d.probe);
+	try t.expectEqual(Verdict.releases, d.verdict);
+	const idle = detect(block(&.{"OS=Windows_NT"}), "", false);
+	try t.expectEqual(Terminal.windows_console, idle.terminal);
+	try t.expectEqual(Probe.not_run, idle.probe);
+	try t.expectEqual(Verdict.unknown, idle.verdict);
+	// A multiplexer that swallows releases still wins over the console adapter.
+	try t.expectEqual(Verdict.no_releases, detect(block(&.{ "OS=Windows_NT", "HERDR_ENV=1" }), "\x1b[?11u\x1b[?62c", true).verdict);
 }
 
 test "a reply without the event-types flag means no releases (Zellij answers ?1u)" {

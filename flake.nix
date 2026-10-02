@@ -88,7 +88,7 @@
           zig build test -Dcpu=baseline || failures=$((failures + 1))
           zig build -Dcpu=baseline || failures=$((failures + 1))
           export SPY_HUNTER_BIN=$PWD/zig-out/bin/spy-hunter-music
-          for suite in tests/cli tests/terminal tests/build tests/web/run tests/rom/run; do
+          for suite in tests/cli tests/terminal tests/build tests/web/run tests/rom/run tests/windows/run; do
             bash "$suite" || failures=$((failures + 1))
           done
           [ "$failures" -eq 0 ]
