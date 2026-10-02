@@ -1,0 +1,10 @@
+/.nix-out/
+/.build-work/
+/result
+*.wav
+*.pcm
+/bin/linux/
+/bin/macos/
+/zig-out/
+/.zig-cache/
+/zig-pkg/

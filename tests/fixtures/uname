@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+case "$1" in -s) printf '%s\n' "$TEST_OS";; -m) printf '%s\n' "$TEST_ARCH";; *) exit 1;; esac

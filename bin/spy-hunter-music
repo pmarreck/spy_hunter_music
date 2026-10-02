@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -u
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
+os="$(uname -s)";arch="$(uname -m)"
+case "$os" in Linux) os=linux;; Darwin) os=macos;; *) printf 'Unsupported OS: %s\n' "$os" >&2;exit 1;; esac
+case "$arch" in arm64|aarch64)arch=aarch64;; x86_64|amd64)arch=x86_64;; *)exit 1;; esac
+command="$root/bin/$os/$arch/spy-hunter-music"
+if [[ ! -x "$command" ]]; then "$root/build" || exit 1; fi
+exec "$command" "$@"

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -u
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")" || exit 1
+./build || exit 1
+os="$(uname -s)"; arch="$(uname -m)"
+[[ "$os" != Darwin ]] || os=macos
+[[ "$os" != Linux ]] || os=linux
+[[ "$arch" != arm64 ]] || arch=aarch64
+exec "./bin/$os/$arch/spy-hunter-music" "$@"

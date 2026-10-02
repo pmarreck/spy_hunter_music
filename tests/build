@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -u
+scratch="$(mktemp -d "${TMPDIR:-/tmp}/spy-hunter-build-tests.XXXXXX")" || exit 1
+trap 'rm -r -- "$scratch"' EXIT
+export TEST_FIXTURES="$PWD/tests/fixtures" TEST_PACKAGE="$scratch/package"
+export PATH="$TEST_FIXTURES:$PATH"
+root="$scratch/source with spaces"
+mkdir -p "$root" || exit 1
+cp build "$root/build" || exit 1
+mkdir -p "$root/bin" || exit 1
+cp bin/spy-hunter-music "$root/bin/spy-hunter-music" || exit 1
+export TEST_OS=Linux TEST_ARCH=x86_64
+bash "$root/build" >/dev/null 2>&1 || exit 1
+[[ -x "$root/bin/linux/x86_64/spy-hunter-music" ]] || exit 1
+first="$(readlink "$root/bin/linux/x86_64/spy-hunter-music")"
+export TEST_BUILD_FAIL=1
+bash "$root/build" >/dev/null 2>&1
+[[ $? -ne 0 && "$(readlink "$root/bin/linux/x86_64/spy-hunter-music")" == "$first" ]] || exit 1
+output="$(bash "$root/bin/spy-hunter-music" --about)"
+[[ $? -eq 0 && "$output" == fixture ]] || exit 1
+export TEST_BUILD_FAIL=0 TEST_OS=Darwin TEST_ARCH=arm64
+bash "$root/build" >/dev/null 2>&1 || exit 1
+[[ -x "$root/bin/macos/aarch64/spy-hunter-music" && -x "$root/bin/linux/x86_64/spy-hunter-music" ]] || exit 1
+output="$(bash "$root/bin/spy-hunter-music" --about)"
+[[ $? -eq 0 && "$output" == fixture ]] || exit 1
+export TEST_OS=Darwin TEST_ARCH=x86_64
+bash "$root/build" >/dev/null 2>&1
+[[ $? -ne 0 ]] || exit 1
+printf 'PASS: host publication, spaces, rejected targets and failure preservation\n'

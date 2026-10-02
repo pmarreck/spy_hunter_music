@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -u
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")" || exit 1
+os="$(uname -s)"; arch="$(uname -m)"
+case "$os" in Linux) os=linux;; Darwin) os=macos;; *) printf 'Unsupported OS: %s\n' "$os" >&2;exit 1;; esac
+case "$arch" in arm64|aarch64) arch=aarch64;; amd64|x86_64) arch=x86_64;; *) printf 'Unsupported architecture: %s\n' "$arch" >&2;exit 1;; esac
+[[ "$os/$arch" != macos/x86_64 ]] || { printf 'macOS x86_64 is unsupported.\n' >&2;exit 1; }
+target="$arch-${os/macos/darwin}"
+product=".nix-out/$target/ReleaseFast"
+bin="bin/$os/$arch"
+lock=".build-work/$target/publish.lock"
+mkdir -p "$(dirname "$lock")" "$(dirname "$product")" "$bin" || exit 1
+mkdir "$lock" 2>/dev/null || { printf 'A build is already publishing this host target.\n' >&2;exit 1; }
+temporary=''
+trap '[[ -z "$temporary" ]] || rmdir "$temporary"; rmdir "$lock"' EXIT
+[[ ! -e "$bin/spy-hunter-music" || -L "$bin/spy-hunter-music" ]] || { printf 'Refusing to replace an unknown executable.\n' >&2;exit 1; }
+nix build .#default --out-link "$product" || exit 1
+[[ -x "$product/bin/spy-hunter-music" ]] || { printf 'Build did not produce the expected executable.\n' >&2;exit 1; }
+temporary="$(mktemp -d "$bin/.publish.XXXXXX")" || exit 1
+ln -s "../../../$product/bin/spy-hunter-music" "$temporary/spy-hunter-music" || exit 1
+mv -f "$temporary/spy-hunter-music" "$bin/spy-hunter-music" || exit 1
+printf 'Ready: %s/%s/spy-hunter-music\n' "$PWD" "$bin" >&2

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+	<title>Spy Hunter Music</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="style.css">
+	<script type="module" src="app.js"></script>
+</head>
+<body>
+	<div class="art" role="img" aria-label="Spy Hunter artwork"></div>
+	<main class="console" aria-label="Spy Hunter sound board">
+		<div class="buttons">
+			<button id="play" class="chip cyan" type="button" aria-keyshortcuts="p">Play</button>
+			<button id="fire" class="chip magenta fire" type="button" aria-keyshortcuts="Space" disabled>Fire</button>
+			<button id="death" class="chip yellow" type="button" aria-keyshortcuts="d" disabled>Death cue</button>
+		</div>
+		<div class="readout">
+			<p id="status" class="status" role="status">Press Play.</p>
+			<p class="keys">Space fires while held · D death cue · P pause</p>
+		</div>
+	</main>
+</body>
+</html>

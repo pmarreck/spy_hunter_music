@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Web player checks: key mapping classifier and the built wasm core driven
+# through web/core.js in Node. Builds zig-out/web first.
+set -u
+zig build web || { printf 'FAIL: zig build web\n' >&2; exit 1; }
+failures=0
+node tests/web/keys.test.mjs || failures=$((failures + 1))
+node tests/web/wasm.test.mjs zig-out/web/spy_hunter.wasm || failures=$((failures + 1))
+for file in index.html style.css app.js core.js keys.js worklet.js spy_hunter.wasm; do
+	[[ -s "zig-out/web/$file" ]] || { printf 'FAIL: zig-out/web/%s missing\n' "$file" >&2; failures=$((failures + 1)); }
+done
+exit "$failures"

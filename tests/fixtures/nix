@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -u
+[[ "${TEST_BUILD_FAIL:-0}" != 1 ]] || exit 17
+output=''
+while [[ $# -gt 0 ]]; do
+	if [[ "$1" == --out-link ]]; then output="$2";shift; fi
+	shift
+done
+[[ -n "$output" ]] || exit 1
+mkdir -p "$TEST_PACKAGE/bin" || exit 1
+cp "$TEST_FIXTURES/spy-hunter-music" "$TEST_PACKAGE/bin/spy-hunter-music" || exit 1
+ln -sfn "$TEST_PACKAGE" "$output"

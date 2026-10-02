@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# ROM-dependent regressions: only where a locally owned spyhunt.zip exists.
+# Without one, report the checks as NOT RUN (never as passed).
+set -u
+bin="${SPY_HUNTER_BIN:?SPY_HUNTER_BIN must point at the CLI}"
+rom=''
+for candidate in "${SPY_HUNTER_ROM:-}" "$HOME/Code/spy_hunter_music/local/spyhunt.zip" /mnt/Fileserver/Emulation/ROMs/MAME/ROMs/spyhunt.zip "$HOME/ROMs/spyhunt.zip"; do
+	[[ -n "$candidate" && -r "$candidate" ]] && { rom="$candidate"; break; }
+done
+if [[ -z "$rom" ]]; then
+	printf '\033[33mNOT RUN: ROM regressions (no local spyhunt.zip)\033[0m\n'
+	exit 0
+fi
+case "$(uname -s)-$(uname -m)" in
+	Linux-x86_64) platform=linux-x86_64;; Linux-aarch64) platform=linux-aarch64;; Darwin-arm64) platform=macos-aarch64;; *) platform=unknown;;
+esac
+scratch="$(mktemp -d "${TMPDIR:-/tmp}/spy-hunter-rom-tests.XXXXXX")" || exit 1
+trap 'rm -r -- "$scratch"' EXIT
+failures=0
+fail() { printf 'FAIL: %s\n' "$1" >&2; failures=$((failures + 1)); }
+render() { "$bin" render --rom "$rom" --seconds 12 --command "$1" --output "$scratch/cmd$1.wav" 2>"$scratch/cmd$1.err" || fail "render --command $1: $(cat "$scratch/cmd$1.err")"; }
+for command in 0 1 2; do render "$command"; done
+digest() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1 || shasum -a 256 "$1" | cut -d' ' -f1; }
+while read -r pinned_platform command expected; do
+	[[ "$pinned_platform" == "$platform" ]] || continue
+	actual="$(digest "$scratch/cmd$command.wav")"
+	[[ "$actual" == "$expected" ]] || fail "command $command render changed on $platform: $actual"
+done < <(grep -v '^#' "$(dirname "$0")/hashes")
+grep -q "^$platform " "$(dirname "$0")/hashes" || printf '\033[33mNOTE: no pinned render hashes for %s\033[0m\n' "$platform"
+# The browser's wasm core must produce the same audio as the native CLI.
+wasm="$(dirname "$0")/../../zig-out/web/spy_hunter.wasm"
+if command -v node >/dev/null 2>&1 && [[ -s "$wasm" ]]; then
+	node "$(dirname "$0")/wasm-render.mjs" "$wasm" "$rom" 12 1 > "$scratch/wasm1.pcm" 2>"$scratch/wasm.err" || fail "wasm render: $(cat "$scratch/wasm.err")"
+	tail -c +45 "$scratch/cmd1.wav" | cmp -s - "$scratch/wasm1.pcm" || fail "wasm render differs from native render"
+else
+	printf '\033[33mNOT RUN: wasm/native render comparison (node or zig-out/web missing)\033[0m\n'
+fi
+# The death cue must actually play when requested at startup.
+cmp -s "$scratch/cmd0.wav" "$scratch/cmd1.wav" && fail "render --command 0 is identical to driving music (death cue never played)"
+[[ $failures -eq 0 ]] && printf 'PASS: ROM render pins, wasm/native parity and startup death command\n'
+exit "$failures"

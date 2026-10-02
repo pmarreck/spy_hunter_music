@@ -1,0 +1,17 @@
+.{
+    .name = .spy_hunter_music,
+    .version = "0.2.0",
+    .fingerprint = 0xa0947aa66734328b,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .musashi = .{
+            .url = "https://github.com/kstenerud/Musashi/archive/313ebf1bd9f4d0d93341eb5ce21fd8a119e9dbdd.tar.gz",
+            .hash = "N-V-__8AAD0zEwD0CPh0wxlM7pKcZjmTPTkje459LJ2NZ4ci",
+        },
+        .chips = .{
+            .url = "https://github.com/floooh/chips/archive/9e88298ce56319953ac7a43213a1120359f7a3a6.tar.gz",
+            .hash = "N-V-__8AAOzAHwCNzsDM5iVwcAj8vKSXq2s0DlYf0Or3yYLM",
+        },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src", "include", "tests", "LICENSE" },
+}

@@ -1,0 +1,107 @@
+:root {
+	--void: #000000;
+	--cyan: #00f0ff;
+	--magenta: #ff2bd6;
+	--yellow: #fcee0a;
+	--glass: rgba(14, 6, 32, 0.9);
+	--alarm: #ff3b5c;
+	--text: #e9f6ff;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+/* The art fills everything above a slim control bar, so they never overlap. */
+body {
+	background: var(--void);
+	color: var(--text);
+	font: 500 1rem/1.3 "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+	display: grid;
+	grid-template-rows: minmax(0, 1fr) auto;
+	padding-top: env(safe-area-inset-top);
+}
+
+.art {
+	background: url("background.png") center center / contain no-repeat;
+	min-height: 0;
+}
+
+/* Buttons on their own row, text on another, so a thumb on Fire cannot
+ * reach the status line; nothing in the bar is selectable. */
+.console {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 20px;
+	padding: 16px 16px max(14px, env(safe-area-inset-bottom));
+	background: var(--glass);
+	border-top: 1px solid rgba(0, 240, 255, 0.45);
+	user-select: none;
+	-webkit-user-select: none;
+	-webkit-touch-callout: none;
+}
+
+.buttons {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 12px;
+}
+
+.readout {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	align-items: baseline;
+	gap: 4px 14px;
+}
+
+.chip {
+	--edge: var(--cyan);
+	font: 700 0.9rem/1 "Chakra Petch", system-ui, sans-serif;
+	letter-spacing: 0.03em;
+	/* Solid neon fills with black text so the bar reads at a glance. */
+	color: var(--void);
+	background: var(--edge);
+	border: 2px solid var(--edge);
+	box-shadow: 0 0 12px color-mix(in srgb, var(--edge) 55%, transparent);
+	min-height: 48px; /* comfortable touch target */
+	padding: 10px 20px;
+	cursor: pointer;
+	clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+	/* iOS Safari ignores the unprefixed property on buttons and selects
+	 * their text on long-press; the WebKit forms stop that. */
+	touch-action: none;
+	user-select: none;
+	-webkit-user-select: none;
+	-webkit-touch-callout: none;
+	-webkit-tap-highlight-color: transparent;
+	transition: background-color 80ms linear, color 80ms linear, box-shadow 80ms linear;
+}
+.chip.cyan { --edge: var(--cyan); }
+.chip.magenta { --edge: var(--magenta); }
+.chip.yellow { --edge: var(--yellow); }
+.chip.fire { padding-inline: 34px; }
+
+.chip:hover:not(:disabled) { box-shadow: 0 0 20px var(--edge); }
+.chip:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.chip:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+/* Held fire and pressed states answer the user's own action: flash white-hot. */
+.chip.active, .chip:active:not(:disabled) {
+	background: #ffffff;
+	border-color: var(--edge);
+	box-shadow: 0 0 22px var(--edge), 0 0 44px var(--edge);
+}
+
+.status { margin: 0; color: var(--cyan); font-size: 0.85rem; }
+.status.error { color: var(--alarm); }
+.keys { margin: 0; font-size: 0.8rem; color: rgba(233, 246, 255, 0.6); }
+
+@media (max-width: 560px) {
+	.keys { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.chip { transition: none; }
+}

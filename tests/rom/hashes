@@ -1,0 +1,8 @@
+# SHA-256 of 12 s WAV renders (`render --seconds 12 --command N`) from the
+# owned ROM set; pinned per platform because float rounding differs slightly.
+# Command 2 re-pinned 2026-10-02: intro now follows an acknowledged drive
+# command instead of merging with it (see board.command).
+# platform command sha256
+linux-x86_64 1 515ee6599e9da2772a92d53c94040a00a3494b356068665472021248bcf05529
+linux-x86_64 2 bd2d18670091682363ca7bb7a066f7f82908bf8dc66b026cd3789e2e8075a4c7
+linux-x86_64 0 520236c611144e07b41f43ba030c617f215dbe1ef2cfc437ff43c57dfe789a37

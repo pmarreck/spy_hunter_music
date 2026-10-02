@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Complete test entry point: Zig core units, C CLI surface, PTY terminal
+# restoration, host build publication and (when a local ROM exists) ROM
+# render regressions. Accumulates failures; nonzero exit if any suite fails.
+set -u
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")" || exit 1
+if ! command -v zig >/dev/null 2>&1; then exec nix develop -c ./test "$@"; fi
+failures=0
+# Nix packages only git-tracked files; an untracked source passes here but is
+# missing from the published build.
+untracked="$(git ls-files --others --exclude-standard -- src include tests build.zig build.zig.zon flake.nix build)"
+if [[ -n "$untracked" ]]; then
+	printf 'FAIL: untracked files would be missing from the Nix package:\n%s\n' "$untracked" >&2
+	failures=$((failures + 1))
+fi
+zig build test || failures=$((failures + 1))
+if zig build; then
+	export SPY_HUNTER_BIN="$PWD/zig-out/bin/spy-hunter-music"
+	for suite in tests/cli tests/terminal tests/build tests/web/run tests/rom/run; do
+		bash "$suite" || failures=$((failures + 1))
+	done
+else
+	printf 'FAIL: zig build\n' >&2
+	failures=$((failures + 1))
+fi
+exit "$failures"

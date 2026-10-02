@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# CLI surface of the C binary: help/about, argument validation, path
+# handling (spaces, stdin) and ROM-admission errors, using non-ROM fixtures.
+set -u
+bin="${SPY_HUNTER_BIN:?SPY_HUNTER_BIN must point at the CLI}"
+fixtures="$PWD/tests/fixtures"
+failures=0
+fail() { printf 'FAIL: %s\n' "$1" >&2; failures=$((failures + 1)); }
+run() { output="$("$bin" "$@" 2>&1)"; status=$?; }
+expect() { # expect STATUS SUBSTRING DESCRIPTION
+	if [[ "$1" == 0 && $status -ne 0 || "$1" != 0 && $status -eq 0 || "$output" != *"$2"* ]]; then
+		fail "$3 (status $status): $output"
+	fi
+}
+run --help; expect 0 'spy-hunter-music' '--help'
+run -h; expect 0 'p pauses' '-h mentions pause'
+run --about; expect 0 '0.2.0' '--about'
+[[ "$output" != *$'\n'* && "$output" == *"$(uname -m | sed 's/arm64/aarch64/')"* ]] || fail "--about is one line naming the architecture: $output"
+run --not-an-option; expect 1 'Unknown option: --not-an-option' 'unknown option'
+run --json=1; expect 1 'Unknown option: --json=1' 'flag given a value'
+run --seconds 0 --about; expect 1 'Seconds must be' 'zero seconds'
+run --seconds=nope; expect 1 'Invalid seconds' 'non-numeric seconds'
+run --command 16; expect 1 'Command must be' 'command out of range'
+run --command 1.5; expect 1 'Command must be' 'fractional command'
+run --volume 2; expect 1 'Volume must be' 'volume out of range'
+run render; expect 1 'render requires --output' 'render without output'
+run --rom; expect 1 'Missing value for --rom' 'missing option value'
+run --about --help; expect 0 'Usage:' 'later mode overrides earlier'
+run inspect --rom "$fixtures/no such dir/spy hunt.zip"; expect 1 'Cannot open ROM archive' 'missing archive path with spaces'
+[[ "$output" == *"no such dir/spy hunt.zip"* ]] || fail "path with spaces preserved: $output"
+run inspect -- "$fixtures/also missing.zip"; expect 1 'also missing.zip' 'ROM path after --'
+run inspect -- a b; expect 1 'exactly one ROM path' 'two paths after --'
+run inspect --rom "$fixtures/deflate.zip"; expect 1 'ROM SHA-1 mismatch: csd_u7a.u7' 'identity check on deflated member'
+output="$("$bin" inspect --rom - < "$fixtures/stored.zip" 2>&1)"; status=$?
+expect 1 'ROM SHA-1 mismatch: csd_u7a.u7' 'stored ZIP from stdin'
+output="$(printf 'not a zip' | "$bin" inspect --rom @stdin 2>&1)"; status=$?
+expect 1 'Not a readable ZIP archive' 'malformed ZIP from @stdin'
+output="$("$bin" play --rom "$fixtures/deflate.zip" < /dev/null 2>&1)"; status=$?
+expect 1 'ROM SHA-1 mismatch' 'admission precedes playback'
+# --tips: environment-driven advice; without a terminal the live check cannot run.
+tips() { output="$(env -i "$@" "$bin" --tips < /dev/null 2>&1)"; status=$?; }
+tips TERM_PROGRAM=WezTerm; expect 0 'config.enable_kitty_keyboard = true' '--tips in WezTerm'
+[[ "$output" == *'Live check: not run'* && "$output" == *'Hold-to-fire: unknown'* ]] || fail "--tips without a terminal: $output"
+[[ "$output" != *$'\033'* ]] || fail '--tips output to a pipe has no ANSI'
+tips TERM_PROGRAM=Apple_Terminal; expect 0 'Apple Terminal does not report key releases' '--tips in Apple Terminal'
+tips VTE_VERSION=7600; expect 0 'VTE-based terminals' '--tips in GNOME Terminal'
+tips HERDR_ENV=1 TERM_PROGRAM=herdr WEZTERM_PANE=1; expect 0 'outside Herdr' '--tips in Herdr'
+tips TMUX=/tmp/t,1,0; expect 0 'outside tmux' '--tips in tmux'
+output="$(env -i TERM_PROGRAM=WezTerm "$bin" --tips --json < /dev/null 2>&1)"; status=$?
+expect 0 '"terminal":"wezterm"' '--tips --json'
+[[ "$output" == '{'*'}' ]] || fail "--tips --json is one JSON object: $output"
+run --help; expect 0 '--tips' '--help lists --tips'
+[[ $failures -eq 0 ]] && printf 'PASS: CLI help, about, arguments, paths, admission errors and --tips\n'
+exit "$failures"
